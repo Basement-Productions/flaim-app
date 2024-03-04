@@ -1,5 +1,5 @@
-import { UserCredential } from "firebase/auth"
-import { Timestamp } from "firebase/firestore"
+import { UserCredential } from "firebase/auth";
+import { Timestamp } from "firebase/firestore";
 
 export type AuthResponse = {
     token: UserCredential | null;
@@ -27,10 +27,10 @@ export type Goal = {
     uid: string;
     name: string;
     tag?: string;
-    isPrivate: boolean;
-    isApprovalOpen: boolean;
+    onlyColabsCanView: boolean;
+    onlyColabsCanApprove: boolean;
     reward?: string;
-    goalEndDate: Date;
+    goalEndDate: Timestamp;
     updatedAt: Timestamp;
     createdAt: Timestamp;
 
@@ -38,10 +38,10 @@ export type Goal = {
     //Used for querying goals
     collaboratorUids: string[];
 
-    collaborators: GoalCollaborator[];
-    comments: GoalComment[];
-    approvals: GoalApproval[];
-    posts: GoalPost[];
+    collaborators?: GoalCollaborator[];
+    comments?: GoalComment[];
+    approvals?: GoalApproval[];
+    posts?: GoalPost[];
 }
 
 export type GoalCollaborator = {
@@ -54,9 +54,13 @@ export type GoalComment = {
     uid: string;
     userUid: string;
     comment: string;
-    likes: number;
-    updatedAt: Timestamp;
     createdAt: Timestamp;
+    likes?: CommentLike[];
+}
+
+export type CommentLike = {
+    userUid: string;
+    isLiked: boolean;
 }
 
 export type GoalApproval = {
