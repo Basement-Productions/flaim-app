@@ -12,6 +12,9 @@ import useUserStore from './services/store/userStore';
 import { db_GetCurrentUser, db_UpdateUser } from './services/db/userService';
 import { FlaimUser } from './constants/types';
 import firebase from 'firebase/app';
+import ImagePicker from 'react-native-image-picker';
+import { MediaType } from 'react-native-image-picker';
+
 import { fs } from '../firebase'; // assuming you have a firebase configuration
 
 
@@ -25,6 +28,7 @@ export default function editProfile() {
     const [firstName, setFirstName] = useState<string>();
     const [lastName, setLastName] = useState<string>();
     const [bio, setBio] = useState<string>();
+    const [profilePic, setProfilePic] = useState<string>();
 
 
 
@@ -83,7 +87,8 @@ export default function editProfile() {
                     break;
 
                 case 1:
-                    // Delete
+                    openCameraRoll();
+
                     break;
 
                 case 2:
@@ -93,8 +98,47 @@ export default function editProfile() {
     }
 
     const openCamera = () => {
-        navigation.navigate('camera')
+        // navigation.navigate('camera')
+        router.push({ pathname: "/camera", params: { profile: currentUser?.uid || "defaultUserId" } });
     }
+
+
+
+    const updateProfilePic = async (photo:string) => {
+        console.log("update profile")
+        const updatedUser = {
+            ...currentUser,
+            profilePictureUrl: photo
+        }
+
+        try {
+            await db_UpdateUser(updatedUser)
+            toast.success("Changes have been saved", {
+                width: 300,
+                position: ToastPosition.BOTTOM
+            });
+        }
+        catch (error) {
+            toast.error("Changes could not be saved", {
+                width: 300,
+                position: ToastPosition.BOTTOM
+            });
+            console.log(error, "error")
+        }
+
+    }
+
+    const openCameraRoll = () => {
+        const options: ImagePicker.ImageLibraryOptions = {
+            mediaType: "photo", // Use MediaType.Photo instead of 'photo'
+          };
+        ImagePicker.launchImageLibrary(options, (response) => {
+          if (!response.didCancel) {
+            // If the user selects an image, set it as the image state
+            console.log("ye")
+          }
+        });
+      };
 
     const handleTextChange = (fieldName: string) => (text: string) => {
         // Your logic here
