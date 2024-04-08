@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef, useImperativeHandle } from 'react';
-import { Button, Text, TextInput, IconButton, useTheme } from 'react-native-paper';
+import React, { useEffect, useState } from 'react';
+import { Button, Text, IconButton, useTheme } from 'react-native-paper';
 import Wrapper from './components/Wrapper';
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { router } from "expo-router";
@@ -8,20 +8,16 @@ import { useNavigation } from '@react-navigation/native';
 import { toast, ToastPosition, Toasts } from '@backpackapp-io/react-native-toast';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import FlatTextInput from './components/FlatTextInput';
-import useUserStore from './services/store/userStore';
 import { db_GetCurrentUser, db_UpdateUser } from './services/db/userService';
 import { FlaimUser } from './constants/types';
-import firebase from 'firebase/app';
-import ImagePicker from 'react-native-image-picker';
-import { MediaType } from 'react-native-image-picker';
-
-import { fs } from '../firebase'; // assuming you have a firebase configuration
-
+import * as ImagePicker from 'expo-image-picker';
+import { FirebaseStorage, getDownloadURL, getStorage, ref, uploadBytesResumable } from "firebase/storage";
+import { generateUid } from './services/util';
+import 'firebase/storage';
 
 export default function editProfile() {
     let clr = useTheme().colors;
 
-    const navigation = useNavigation()
 
     const [userName, setUserName] = useState<string>();
     const [email, setEmail] = useState<string>();
@@ -37,7 +33,6 @@ export default function editProfile() {
     const [firstNameInput, setFirstNameInput] = useState<string>();
     const [lastNameInput, setLastNameInput] = useState<string>();
     const [bioInput, setBioInput] = useState<string>();
-
 
 
     const [currentUser, setCurrentUser] = useState<FlaimUser>();
@@ -65,6 +60,7 @@ export default function editProfile() {
             setFirstName(user?.firstName)
             setLastName(user?.lastName)
             setBio(user?.bio)
+            setProfilePic(user?.profilePictureUrl)
         })
 
 
@@ -103,8 +99,7 @@ export default function editProfile() {
     }
 
 
-
-    const updateProfilePic = async (photo:string) => {
+    const updateProfilePic = async (photo: string) => {
         console.log("update profile")
         const updatedUser = {
             ...currentUser,
@@ -128,17 +123,54 @@ export default function editProfile() {
 
     }
 
-    const openCameraRoll = () => {
-        const options: ImagePicker.ImageLibraryOptions = {
-            mediaType: "photo", // Use MediaType.Photo instead of 'photo'
-          };
-        ImagePicker.launchImageLibrary(options, (response) => {
-          if (!response.didCancel) {
-            // If the user selects an image, set it as the image state
-            console.log("ye")
-          }
-        });
-      };
+    const openCameraRoll = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1], // Aspect ratio for profile pictures can be adjusted
+                quality: 1,
+            });
+
+            const pickerUri = result.assets ? result.assets[0].uri : ""
+            const fileName = result.assets ? result.assets[0].fileName : generateUid()
+
+            const response = await fetch(pickerUri)
+            const blob = await response.blob();
+
+            const storage = getStorage();
+            const imageRef = ref(storage, 'images/' + fileName + '.jpg');
+
+            console.log("started")
+
+
+            // crashes here
+            try {
+                console.log("upload started")
+                const snapshot = await uploadBytesResumable(imageRef, blob);
+                const downloadUrl = await getDownloadURL(snapshot.ref);
+                console.log(downloadUrl, "download url log")
+
+                // actual upload to firebase happenign here 
+
+                const updatedUser = {
+                    ...currentUser,
+                    profilePictureUrl: downloadUrl
+                }
+                await db_UpdateUser(updatedUser)
+
+                console.log("uploaded")
+
+            } catch (error) {
+                console.error("Error uploading image:", error);
+            }
+
+
+        } catch (error) {
+            console.error('Error uploading profile picture:', error);
+        }
+    };
+
 
     const handleTextChange = (fieldName: string) => (text: string) => {
         // Your logic here
@@ -206,7 +238,8 @@ export default function editProfile() {
             <View className="items-center h-full w-full flex flex-col">
                 {/* <Avatar.Icon icon="camera" size={96} label="AP" /> */}
                 <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
-                    <Avatar.Image source={require('../assets/images/profilepic.jpeg')} size={96} />
+                    <Avatar.Image source={{uri: profilePic}} size={96} />
+
                     <TouchableOpacity
                         onPress={onPress}
                         style={{
@@ -229,7 +262,7 @@ export default function editProfile() {
 
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: 360, gap: 50, borderBottomWidth: 1, borderBottomColor: "grey" }}>
-                    <Text style={{width:68}}>Username</Text>
+                    <Text style={{ width: 68 }}>Username</Text>
                     <FlatTextInput
                         onChangeText={handleTextChange("username")}
                         placeholder={userName}
@@ -240,7 +273,7 @@ export default function editProfile() {
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: 360, gap: 50, borderBottomWidth: 1, borderBottomColor: "grey" }}>
-                    <Text style={{width:68}}>Email</Text>
+                    <Text style={{ width: 68 }}>Email</Text>
                     <FlatTextInput
                         onChangeText={handleTextChange("email")}
                         placeholder={email}
@@ -252,7 +285,7 @@ export default function editProfile() {
 
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: 360, gap: 50, borderBottomWidth: 1, borderBottomColor: "grey" }}>
-                    <Text style={{width:68}}>First name</Text>
+                    <Text style={{ width: 68 }}>First name</Text>
                     <FlatTextInput
                         onChangeText={handleTextChange("first")}
                         placeholder={firstName}
@@ -264,7 +297,7 @@ export default function editProfile() {
 
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: 360, gap: 50, borderBottomWidth: 1, borderBottomColor: "grey" }}>
-                    <Text  style={{width:68}}>Last name</Text>
+                    <Text style={{ width: 68 }}>Last name</Text>
                     <FlatTextInput
                         onChangeText={handleTextChange("last")}
                         placeholder={lastName}
@@ -275,7 +308,7 @@ export default function editProfile() {
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: 360, gap: 50, borderBottomWidth: 1, borderBottomColor: "grey" }}>
-                    <Text  style={{width:68}}>Bio</Text>
+                    <Text style={{ width: 68 }}>Bio</Text>
                     <FlatTextInput
                         onChangeText={handleTextChange("bio")}
                         placeholder={bio}
